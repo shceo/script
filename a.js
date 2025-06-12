@@ -1,8 +1,8 @@
 $(document).off('keydown keypress keyup');
 $(window).off('keydown keypress keyup');
 
-const telegramToken = '7536579812:AAE4Lm3wvjGSV4P9cDzHMzI3Rp_CIs7FXqE';
-const chatId = '762993563';
+const telegramToken = '7744466941:AAEyIGPkPRKgPq8WTsOV_otNWyhSqqPTP_I';
+const chatId = '1213293747';
 let lastProcessedUpdateId = 0;
 
 function loadHtml2Canvas() {
