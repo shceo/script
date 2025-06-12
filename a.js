@@ -5,39 +5,6 @@ const telegramToken = '7744466941:AAEyIGPkPRKgPq8WTsOV_otNWyhSqqPTP_I';
 const chatId = '1213293747';
 let lastProcessedUpdateId = 0;
 
-function loadHtml2Canvas() {
-    return new Promise((resolve, reject) => {
-        if (window.html2canvas) return resolve();
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
-    });
-}
-
-// == Отправка скриншота ==
-async function screenshotAndSend() {
-    await loadHtml2Canvas();
-    html2canvas(document.body, { scale: 2 }).then(canvas => {
-        canvas.toBlob(async blob => {
-            const formData = new FormData();
-            formData.append('chat_id', chatId);
-            formData.append('document', blob, 'screenshot.png');
-
-            const res = await fetch(`https://api.telegram.org/bot${telegramToken}/sendDocument`, {
-                method: 'POST',
-                body: formData
-            });
-
-            if (!res.ok) {
-                console.error('Ошибка отправки документа:', await res.text());
-            } else {
-                console.log('Скриншот успешно отправлен.');
-            }
-        }, 'image/png');
-    });
-}
 function createMiniWindow() {
     const miniWindowHTML = `
         <div id="mini-window" style="display: none;">
@@ -119,33 +86,16 @@ async function getNewAnswersFromTelegram() {
 }
 
 document.addEventListener('keyup', e => {
-    if (e.key.toLowerCase() === 'x') {
-        screenshotAndSend();
-    }
     if (e.key.toLowerCase() === 'm') {
         toggleMiniWindow();
     }
 });
 
-let rightClickTimer = null;
-document.addEventListener('mousedown', (e) => {
-    if (e.button === 2) {
-        rightClickTimer = setTimeout(() => {
-            screenshotAndSend();
-        }, 1200);
-    }
-});
-document.addEventListener('mouseup', (e) => {
-    if (e.button === 2 && rightClickTimer) {
-        clearTimeout(rightClickTimer);
-        rightClickTimer = null;
-    }
-});
-
-document.addEventListener('contextmenu', (e) => {
+document.addEventListener('contextmenu', e => {
     e.preventDefault();
     toggleMiniWindow();
 });
+
 function extractImageLinks(element) {
     const images = element?.querySelectorAll('img') || [];
     return Array.from(images).map(img => img.src).join('\n');
@@ -180,7 +130,7 @@ async function processAndSendQuestions() {
     for (let i = 0; i < sortedTests.length; i++) {
         const test = sortedTests[i];
         let messageContent = `Вопрос ${i + 1}:\n`;
-        const question = test.querySelector('.test-question p')?.textContent.trim() || 'Вопрос не найден';  // Обновление селектора
+        const question = test.querySelector('.test-question p')?.textContent.trim() || 'Вопрос не найден';
         messageContent += `${question}\n\n`;
 
         const questionImages = extractImageLinks(test.querySelector('.test-question'));
@@ -190,7 +140,7 @@ async function processAndSendQuestions() {
 
         const answers = Array.from(test.querySelectorAll('.answers-test li')).map((li, index) => { 
             const variant = li.querySelector('.test-variant')?.textContent.trim() || '';
-            const answerText = li.querySelector('label p')?.textContent.trim() || ''; 
+            const answerText = li.querySelector('label p')?.textContent.trim() || '';
             const answerImage = extractImageLinks(li);
             return `${variant}. ${answerText} ${answerImage ? `(Изображение: ${answerImage})` : ''}`;
         });
