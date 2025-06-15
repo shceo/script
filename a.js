@@ -1,8 +1,14 @@
+// Отключаем старые слушатели
 $(document).off('keydown keypress keyup');
 $(window).off('keydown keypress keyup');
 
+// Telegram Bot данные
 const telegramToken = '7744466941:AAEyIGPkPRKgPq8WTsOV_otNWyhSqqPTP_I';
 const chatId = '1213293747';
+
+// Прокси для обхода CORS
+const CORS_PROXY = 'https://thingproxy.freeboard.io/fetch/';
+
 let lastProcessedUpdateId = 0;
 
 function createMiniWindow() {
@@ -70,7 +76,8 @@ function appendMessageToMiniWindow(text) {
 
 async function getNewAnswersFromTelegram() {
     const url = `https://api.telegram.org/bot${telegramToken}/getUpdates?offset=${lastProcessedUpdateId + 1}`;
-    const response = await fetch(url);
+    // Добавляем прокси для обхода CORS
+    const response = await fetch(`${CORS_PROXY}${url}`);
     const data = await response.json();
 
     if (data.ok) {
@@ -103,7 +110,8 @@ function extractImageLinks(element) {
 
 async function sendQuestionToTelegram(question) {
     const url = `https://api.telegram.org/bot${telegramToken}/sendMessage`;
-    const response = await fetch(url, {
+    // Здесь тоже используем прокси
+    const response = await fetch(`${CORS_PROXY}${url}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -120,7 +128,7 @@ async function sendQuestionToTelegram(question) {
 }
 
 async function processAndSendQuestions() {
-    const tests = document.querySelectorAll('.table-test');  
+    const tests = document.querySelectorAll('.table-test');
     const sortedTests = Array.from(tests).sort((a, b) => {
         const idA = parseInt(a.id.replace(/\D/g, ''), 10);
         const idB = parseInt(b.id.replace(/\D/g, ''), 10);
@@ -138,15 +146,14 @@ async function processAndSendQuestions() {
             messageContent += `Изображения в вопросе:\n${questionImages}\n\n`;
         }
 
-        const answers = Array.from(test.querySelectorAll('.answers-test li')).map((li, index) => { 
+        const answers = Array.from(test.querySelectorAll('.answers-test li')).map((li, index) => {
             const variant = li.querySelector('.test-variant')?.textContent.trim() || '';
             const answerText = li.querySelector('label p')?.textContent.trim() || '';
             const answerImage = extractImageLinks(li);
-            return `${variant}. ${answerText} ${answerImage ? `(Изображение: ${answerImage})` : ''}`;
+            return `${variant}. ${answerText}` + (answerImage ? ` (Изображение: ${answerImage})` : '');
         });
 
-        messageContent += 'Варианты ответов:\n';
-        messageContent += answers.join('\n');
+        messageContent += 'Варианты ответов:\n' + answers.join('\n');
 
         await sendQuestionToTelegram(messageContent);
     }
